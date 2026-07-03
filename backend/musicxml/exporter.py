@@ -10,12 +10,27 @@ from pathlib import Path
 from music21 import converter
 
 
-def midi_to_musicxml(midi_path: str | Path, output_path: str | Path) -> Path:
-    """Convierte un archivo MIDI en MusicXML.
+# Rejilla de cuantización: divisores del pulso (negra).
+#   4 → hasta semicorcheas (1/16)   ·   3 → tresillos
+_QUANTIZE_DIVISORS = (4, 3)
+
+
+def midi_to_musicxml(
+    midi_path: str | Path,
+    output_path: str | Path,
+    *,
+    quantize: bool = True,
+) -> Path:
+    """Convierte un archivo MIDI en MusicXML con notación legible.
+
+    Pasos de limpieza (Basic Pitch da tiempos "crudos"):
+      1. Cuantización de inicios y duraciones a una rejilla (semicorcheas + tresillos).
+      2. makeNotation: divide en compases y añade silencios, plicas y barrado.
 
     Args:
         midi_path: ruta al .mid de entrada.
         output_path: ruta donde se guardará el .musicxml.
+        quantize: si False, exporta sin cuantizar (tiempos crudos).
 
     Returns:
         La ruta del archivo MusicXML generado.
@@ -25,13 +40,23 @@ def midi_to_musicxml(midi_path: str | Path, output_path: str | Path) -> Path:
 
     score = converter.parse(str(midi_path))
 
-    # Cuantización ligera: alinea las notas a una rejilla (semicorcheas y
-    # tresillos) para que la partitura sea legible. Basic Pitch da tiempos
-    # "crudos"; sin esto, el resultado tiene figuras rítmicas extrañas.
+    if quantize:
+        # 1) Alinear inicios y duraciones a la rejilla musical.
+        try:
+            score.quantize(
+                _QUANTIZE_DIVISORS,
+                processOffsets=True,
+                processDurations=True,
+                inPlace=True,
+            )
+        except Exception:
+            pass  # ante un caso raro, seguimos y exportamos igual.
+
+    # 2) Notación real: compases, silencios, plicas y barrado.
+    #    Sin esto la partitura no tiene silencios ni figuras bien agrupadas.
     try:
-        score.quantize(inPlace=True)
+        score.makeNotation(inPlace=True)
     except Exception:
-        # Si la cuantización falla por algún caso raro, exportamos igualmente.
         pass
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
