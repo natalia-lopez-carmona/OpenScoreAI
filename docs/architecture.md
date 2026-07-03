@@ -43,6 +43,13 @@ Partitura editable
 - Suficiente para Basic Pitch y para el modelo `htdemucs` de Demucs.
 - Nota de rendimiento: revisar drivers CUDA para inferencia PyTorch.
 
+### 5. Exportación a PDF: **MuseScore CLI** (decidido)
+- El PDF se genera llamando **directamente al ejecutable de MuseScore 4**
+  (`backend/musicxml/pdf_exporter.py`), no por la ruta interna de music21 (más frágil).
+- Flujo: MIDI → MusicXML (music21) → PDF (MuseScore).
+- MuseScore se autodetecta; se puede forzar con `MUSESCORE_PATH`.
+- Si no está instalado, el endpoint responde **503** (MIDI y MusicXML siguen funcionando).
+
 ## Pendiente de decidir
 - **Frontend:** React/Vite vs algo más simple (HTMX, Streamlit para prototipo).
-- **Exportación PDF:** music21 requiere MuseScore o LilyPond instalado para el PDF.
+- **Cuantización rítmica:** mejorar la limpieza de figuras (actualmente `quantize()` básico).

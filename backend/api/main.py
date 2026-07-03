@@ -29,6 +29,7 @@ class OutputFormat(str, Enum):
 
     midi = "midi"
     musicxml = "musicxml"
+    pdf = "pdf"
 
 # Carpeta temporal para audios subidos y MIDIs generados.
 WORK_DIR = Path(tempfile.gettempdir()) / "openscoreai"
@@ -52,10 +53,11 @@ def transcribe(
     file: UploadFile = File(...),
     format: OutputFormat = OutputFormat.midi,
 ) -> FileResponse:
-    """Recibe un audio y devuelve su transcripción como MIDI o MusicXML.
+    """Recibe un audio y devuelve su transcripción como MIDI, MusicXML o PDF.
 
     - `format=midi` → archivo .mid (por defecto).
     - `format=musicxml` → archivo .musicxml (partitura editable en MuseScore/Finale).
+    - `format=pdf` → partitura en PDF (requiere MuseScore instalado).
 
     Nota: se define como función síncrona (`def`) a propósito; FastAPI la ejecuta
     en un hilo aparte, evitando bloquear el bucle de eventos durante la inferencia.
@@ -88,18 +90,34 @@ def transcribe(
         audio_path.unlink(missing_ok=True)  # limpiamos el audio de entrada
 
     # 2) Devolver en el formato pedido.
-    if format is OutputFormat.musicxml:
-        from backend.musicxml.exporter import midi_to_musicxml
+    if format is OutputFormat.midi:
+        return FileResponse(midi_path, media_type="audio/midi", filename=f"{stem}.mid")
 
-        xml_path = WORK_DIR / f"{uid}.musicxml"
-        try:
-            midi_to_musicxml(midi_path, xml_path)
-        except Exception as exc:  # noqa: BLE001
-            raise HTTPException(status_code=500, detail=f"Error al exportar MusicXML: {exc}") from exc
+    # MusicXML y PDF parten del MusicXML.
+    from backend.musicxml.exporter import midi_to_musicxml
+
+    xml_path = WORK_DIR / f"{uid}.musicxml"
+    try:
+        midi_to_musicxml(midi_path, xml_path)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Error al exportar MusicXML: {exc}") from exc
+
+    if format is OutputFormat.musicxml:
         return FileResponse(
             xml_path,
             media_type="application/vnd.recordare.musicxml+xml",
             filename=f"{stem}.musicxml",
         )
 
-    return FileResponse(midi_path, media_type="audio/midi", filename=f"{stem}.mid")
+    # format == pdf
+    from backend.musicxml.pdf_exporter import musicxml_to_pdf
+
+    pdf_path = WORK_DIR / f"{uid}.pdf"
+    try:
+        musicxml_to_pdf(xml_path, pdf_path)
+    except RuntimeError as exc:
+        # MuseScore no instalado → 503 (servicio no disponible para esta función).
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Error al exportar PDF: {exc}") from exc
+    return FileResponse(pdf_path, media_type="application/pdf", filename=f"{stem}.pdf")

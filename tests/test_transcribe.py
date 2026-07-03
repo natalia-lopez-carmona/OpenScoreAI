@@ -70,6 +70,29 @@ def test_transcribe_musicxml(tmp_path):
     assert len(notes) >= 3
 
 
+def test_transcribe_pdf(tmp_path):
+    # Se salta si MuseScore no está instalado (p. ej. en CI).
+    from backend.musicxml.pdf_exporter import find_musescore
+
+    if find_musescore() is None:
+        pytest.skip("MuseScore no instalado; se omite la prueba de PDF")
+
+    wav = tmp_path / "melody.wav"
+    _synth_melody(wav)
+
+    with wav.open("rb") as fh:
+        resp = client.post(
+            "/transcribe",
+            params={"format": "pdf"},
+            files={"file": ("melody.wav", fh, "audio/wav")},
+        )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "application/pdf"
+    # Un PDF válido empieza por la firma "%PDF".
+    assert resp.content[:4] == b"%PDF"
+
+
 def test_transcribe_rejects_bad_format():
     resp = client.post("/transcribe", files={"file": ("x.txt", b"no soy audio", "text/plain")})
     assert resp.status_code == 400

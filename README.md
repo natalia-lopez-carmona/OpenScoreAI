@@ -50,12 +50,24 @@ uvicorn backend.api.main:app --reload
 > ⚠️ Los modelos de transcripción (Basic Pitch, Demucs) son pesados y se instalan
 > de forma **incremental**. Ver [docs/architecture.md](docs/architecture.md).
 
+## 🎹 Exportar a PDF (opcional)
+
+El endpoint `format=pdf` requiere **MuseScore 4** instalado (music21 genera el
+MusicXML y MuseScore lo graba en PDF):
+
+```bash
+winget install Musescore.Musescore
+```
+
+Si MuseScore está en una ruta no estándar, define `MUSESCORE_PATH`.
+MIDI y MusicXML **no** necesitan MuseScore.
+
 ## 🗺️ Roadmap (MVP)
 
 - [x] Estructura del proyecto y API base
-- [ ] Endpoint `/transcribe`: audio → MIDI con **Basic Pitch**
-- [ ] Exportar MIDI → **MusicXML** con music21
-- [ ] Exportar **PDF** de la partitura
+- [x] Endpoint `/transcribe`: audio → MIDI con **Basic Pitch**
+- [x] Exportar MIDI → **MusicXML** con music21
+- [x] Exportar **PDF** de la partitura (MuseScore)
 - [ ] (Opcional) Separar voz de la mezcla con **Demucs**
 - [ ] Frontend web para subir audio y descargar partitura
 
