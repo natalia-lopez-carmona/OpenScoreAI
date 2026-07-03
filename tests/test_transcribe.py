@@ -45,6 +45,31 @@ def test_transcribe_returns_valid_midi(tmp_path):
     assert len(notes) >= 3
 
 
+def test_transcribe_musicxml(tmp_path):
+    wav = tmp_path / "melody.wav"
+    _synth_melody(wav)
+
+    with wav.open("rb") as fh:
+        resp = client.post(
+            "/transcribe",
+            params={"format": "musicxml"},
+            files={"file": ("melody.wav", fh, "audio/wav")},
+        )
+
+    assert resp.status_code == 200, resp.text
+    assert "musicxml" in resp.headers["content-type"]
+
+    xml = tmp_path / "out.musicxml"
+    xml.write_bytes(resp.content)
+
+    # El MusicXML devuelto debe ser parseable por music21 y contener notas.
+    from music21 import converter
+
+    score = converter.parse(str(xml))
+    notes = list(score.recurse().notes)
+    assert len(notes) >= 3
+
+
 def test_transcribe_rejects_bad_format():
     resp = client.post("/transcribe", files={"file": ("x.txt", b"no soy audio", "text/plain")})
     assert resp.status_code == 400

@@ -8,6 +8,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 import uuid
+from enum import Enum
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -21,6 +22,13 @@ app = FastAPI(
 
 # Formatos de audio aceptados.
 ALLOWED_AUDIO = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
+
+
+class OutputFormat(str, Enum):
+    """Formato de salida de la transcripción."""
+
+    midi = "midi"
+    musicxml = "musicxml"
 
 # Carpeta temporal para audios subidos y MIDIs generados.
 WORK_DIR = Path(tempfile.gettempdir()) / "openscoreai"
@@ -40,8 +48,14 @@ def root() -> dict[str, str]:
 
 
 @app.post("/transcribe", tags=["transcription"])
-def transcribe(file: UploadFile = File(...)) -> FileResponse:
-    """Recibe un audio y devuelve su transcripción como archivo MIDI.
+def transcribe(
+    file: UploadFile = File(...),
+    format: OutputFormat = OutputFormat.midi,
+) -> FileResponse:
+    """Recibe un audio y devuelve su transcripción como MIDI o MusicXML.
+
+    - `format=midi` → archivo .mid (por defecto).
+    - `format=musicxml` → archivo .musicxml (partitura editable en MuseScore/Finale).
 
     Nota: se define como función síncrona (`def`) a propósito; FastAPI la ejecuta
     en un hilo aparte, evitando bloquear el bucle de eventos durante la inferencia.
@@ -59,12 +73,13 @@ def transcribe(file: UploadFile = File(...)) -> FileResponse:
     uid = uuid.uuid4().hex
     audio_path = WORK_DIR / f"{uid}{suffix}"
     midi_path = WORK_DIR / f"{uid}.mid"
+    stem = Path(file.filename or "transcripcion").stem
 
     # Guardamos el audio subido en disco.
     with audio_path.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
-    # Transcribimos.
+    # 1) Audio → MIDI (siempre).
     try:
         transcribe_to_midi(audio_path, midi_path)
     except Exception as exc:  # noqa: BLE001 - queremos devolver el error al cliente
@@ -72,5 +87,19 @@ def transcribe(file: UploadFile = File(...)) -> FileResponse:
     finally:
         audio_path.unlink(missing_ok=True)  # limpiamos el audio de entrada
 
-    download_name = f"{Path(file.filename or 'transcripcion').stem}.mid"
-    return FileResponse(midi_path, media_type="audio/midi", filename=download_name)
+    # 2) Devolver en el formato pedido.
+    if format is OutputFormat.musicxml:
+        from backend.musicxml.exporter import midi_to_musicxml
+
+        xml_path = WORK_DIR / f"{uid}.musicxml"
+        try:
+            midi_to_musicxml(midi_path, xml_path)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=500, detail=f"Error al exportar MusicXML: {exc}") from exc
+        return FileResponse(
+            xml_path,
+            media_type="application/vnd.recordare.musicxml+xml",
+            filename=f"{stem}.musicxml",
+        )
+
+    return FileResponse(midi_path, media_type="audio/midi", filename=f"{stem}.mid")
