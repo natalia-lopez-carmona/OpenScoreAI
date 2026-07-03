@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Modelos y datos (pesados, no se versionan)
+ai_models/*
+!ai_models/.gitkeep
+datasets/*
+!datasets/.gitkeep
+
+# Salidas generadas
+*.mid
+*.midi
+*.musicxml
+*.pdf
+outputs/
+tmp/
+
+# Audio de prueba
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
