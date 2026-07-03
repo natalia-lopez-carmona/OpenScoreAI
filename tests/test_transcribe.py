@@ -93,6 +93,24 @@ def test_transcribe_pdf(tmp_path):
     assert resp.content[:4] == b"%PDF"
 
 
+def test_transcribe_with_vocal_separation(tmp_path):
+    # Se salta si Demucs/PyTorch no están instalados.
+    pytest.importorskip("demucs")
+
+    wav = tmp_path / "melody.wav"
+    _synth_melody(wav)
+
+    with wav.open("rb") as fh:
+        resp = client.post(
+            "/transcribe",
+            params={"format": "midi", "separate_vocals": "true"},
+            files={"file": ("melody.wav", fh, "audio/wav")},
+        )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.content[:4] == b"MThd"
+
+
 def test_transcribe_rejects_bad_format():
     resp = client.post("/transcribe", files={"file": ("x.txt", b"no soy audio", "text/plain")})
     assert resp.status_code == 400

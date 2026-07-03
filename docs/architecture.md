@@ -32,7 +32,10 @@ Partitura editable
 ### 2. Demucs es **opcional**
 - Solo se necesita si el audio es una **mezcla** y hay que **aislar la voz** antes
   de transcribir. Para grabaciones de voz limpia, se salta este paso.
-- Usa **PyTorch** (aprovecha la GTX 1060).
+- Usa **PyTorch con CUDA** (aprovecha la GTX 1060): separa un clip en segundos.
+- Implementado en `backend/audio/separation.py` con la API de bajo nivel de Demucs
+  (`get_model` + `apply_model`), modelo **htdemucs**, singleton perezoso.
+- Se activa con `separate_vocals=true` en `/transcribe` o el interruptor del frontend.
 
 ### 3. Cuidado con el conflicto TensorFlow vs PyTorch
 - Basic Pitch (TensorFlow/ONNX) y Demucs (PyTorch) pueden chocar en un mismo entorno.

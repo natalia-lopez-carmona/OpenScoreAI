@@ -28,7 +28,9 @@ pytest>=8.0
 httpx>=0.27
 ruff>=0.4
 
-# --- Opcionales / pesados (separación de voz; instalar cuando toque) ---
-# torch>=2.2
-# torchaudio>=2.2
+# --- Separación de voz con Demucs (opcional, pesado ~2.5 GB) ---
+# torch/torchaudio con CUDA se instalan desde el índice de PyTorch:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121
+#   pip install demucs
+# (Para CPU en vez de GPU, usa --index-url .../whl/cpu)
 # demucs>=4.0

@@ -56,12 +56,15 @@ def root() -> FileResponse:
 def transcribe(
     file: UploadFile = File(...),
     format: OutputFormat = OutputFormat.midi,
+    separate_vocals: bool = False,
 ) -> FileResponse:
     """Recibe un audio y devuelve su transcripción como MIDI, MusicXML o PDF.
 
     - `format=midi` → archivo .mid (por defecto).
     - `format=musicxml` → archivo .musicxml (partitura editable en MuseScore/Finale).
     - `format=pdf` → partitura en PDF (requiere MuseScore instalado).
+    - `separate_vocals=true` → aísla la voz con Demucs antes de transcribir
+      (útil para canciones completas; requiere PyTorch/Demucs instalados).
 
     Nota: se define como función síncrona (`def`) a propósito; FastAPI la ejecuta
     en un hilo aparte, evitando bloquear el bucle de eventos durante la inferencia.
@@ -85,13 +88,27 @@ def transcribe(
     with audio_path.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
+    # 0) (Opcional) Separar la voz de la mezcla con Demucs.
+    to_transcribe = audio_path
+    vocals_path = WORK_DIR / f"{uid}_vocals.wav"
+    if separate_vocals:
+        from backend.audio.separation import separate_vocals as extract_vocals
+
+        try:
+            extract_vocals(audio_path, vocals_path)
+            to_transcribe = vocals_path
+        except Exception as exc:  # noqa: BLE001
+            audio_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=500, detail=f"Error al separar la voz: {exc}") from exc
+
     # 1) Audio → MIDI (siempre).
     try:
-        transcribe_to_midi(audio_path, midi_path)
+        transcribe_to_midi(to_transcribe, midi_path)
     except Exception as exc:  # noqa: BLE001 - queremos devolver el error al cliente
         raise HTTPException(status_code=500, detail=f"Error al transcribir: {exc}") from exc
     finally:
         audio_path.unlink(missing_ok=True)  # limpiamos el audio de entrada
+        vocals_path.unlink(missing_ok=True)
 
     # 2) Devolver en el formato pedido.
     if format is OutputFormat.midi:

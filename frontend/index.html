@@ -85,6 +85,13 @@
       border-top-color: var(--accent2); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 6px;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .switch {
+      display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px;
+      border: 1px solid var(--border); border-radius: 10px; cursor: pointer; font-size: .9rem;
+    }
+    .switch:hover { border-color: var(--accent); }
+    .switch input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+    .switch small { display: block; color: var(--muted); font-size: .72rem; margin-top: 2px; }
     footer { text-align: center; margin-top: 22px; font-size: .8rem; color: var(--muted); }
     footer a { color: var(--accent2); text-decoration: none; }
   </style>
@@ -108,6 +115,11 @@
       <label><input type="radio" name="fmt" value="musicxml" /><span>MusicXML<small>.musicxml</small></span></label>
       <label><input type="radio" name="fmt" value="pdf" /><span>PDF<small>partitura</small></span></label>
     </div>
+
+    <label class="switch">
+      <input type="checkbox" id="sepVocals" />
+      <span>🎚️ Separar la voz primero<small>Para canciones completas (aísla la voz con Demucs). Más lento.</small></span>
+    </label>
 
     <button class="go" id="go" disabled>Transcribir</button>
     <div class="status" id="status"></div>
@@ -155,7 +167,8 @@
       try {
         const form = new FormData();
         form.append('file', selectedFile);
-        const resp = await fetch('/transcribe?format=' + fmt, { method: 'POST', body: form });
+        const sep = document.getElementById('sepVocals').checked;
+        const resp = await fetch('/transcribe?format=' + fmt + '&separate_vocals=' + sep, { method: 'POST', body: form });
         if (!resp.ok) {
           let detail = 'Error ' + resp.status;
           try { detail = (await resp.json()).detail || detail; } catch (_) {}
