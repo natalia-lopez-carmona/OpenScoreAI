@@ -12,7 +12,8 @@ def test_health():
     assert resp.json()["status"] == "ok"
 
 
-def test_root():
+def test_root_serves_html():
     resp = client.get("/")
     assert resp.status_code == 200
-    assert "docs" in resp.json()
+    assert resp.headers["content-type"].startswith("text/html")
+    assert "OpenScoreAI" in resp.text

@@ -20,6 +20,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Raíz del proyecto (…/OpenScoreAI) para localizar el frontend.
+BASE_DIR = Path(__file__).resolve().parents[2]
+FRONTEND_INDEX = BASE_DIR / "frontend" / "index.html"
+
 # Formatos de audio aceptados.
 ALLOWED_AUDIO = {".wav", ".mp3", ".flac", ".ogg", ".m4a"}
 
@@ -42,10 +46,10 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "OpenScoreAI", "version": "0.1.0"}
 
 
-@app.get("/", tags=["system"])
-def root() -> dict[str, str]:
-    """Mensaje de bienvenida y enlace a la documentación."""
-    return {"message": "OpenScoreAI está en marcha 🎼", "docs": "/docs"}
+@app.get("/", tags=["ui"], include_in_schema=False)
+def root() -> FileResponse:
+    """Sirve la interfaz web (frontend/index.html)."""
+    return FileResponse(FRONTEND_INDEX, media_type="text/html")
 
 
 @app.post("/transcribe", tags=["transcription"])

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenScoreAI 🎼</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card: #1a1d27;
+      --border: #2a2e3c;
+      --accent: #7c5cff;
+      --accent2: #4cc9f0;
+      --text: #e8eaf0;
+      --muted: #9aa0b4;
+      --ok: #3ddc84;
+      --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(1200px 600px at 50% -10%, #241b4d 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 520px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 32px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.4);
+    }
+    h1 { font-size: 1.7rem; letter-spacing: -.5px; }
+    h1 .grad {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .subtitle { color: var(--muted); margin: 6px 0 24px; font-size: .95rem; }
+    .drop {
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .drop:hover, .drop.drag { border-color: var(--accent); background: rgba(124,92,255,.06); }
+    .drop .icon { font-size: 2.2rem; }
+    .drop .hint { color: var(--muted); font-size: .85rem; margin-top: 8px; }
+    .drop .file { margin-top: 10px; font-weight: 600; color: var(--accent2); word-break: break-all; }
+    input[type=file] { display: none; }
+    .label { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 22px 0 10px; }
+    .formats { display: flex; gap: 8px; }
+    .formats label {
+      flex: 1; text-align: center; padding: 12px 8px; border: 1px solid var(--border);
+      border-radius: 10px; cursor: pointer; font-weight: 600; transition: all .15s;
+    }
+    .formats input { display: none; }
+    .formats input:checked + span { color: #fff; }
+    .formats label:has(input:checked) {
+      border-color: var(--accent); background: linear-gradient(180deg, rgba(124,92,255,.25), rgba(124,92,255,.08));
+    }
+    .formats small { display: block; font-weight: 400; color: var(--muted); font-size: .7rem; margin-top: 3px; }
+    button.go {
+      width: 100%; margin-top: 24px; padding: 14px; border: none; border-radius: 12px;
+      font-size: 1rem; font-weight: 700; color: #fff; cursor: pointer;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: opacity .2s, transform .05s;
+    }
+    button.go:hover { opacity: .92; }
+    button.go:active { transform: translateY(1px); }
+    button.go:disabled { opacity: .5; cursor: not-allowed; }
+    .status { margin-top: 18px; min-height: 22px; font-size: .9rem; text-align: center; }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+    .status.load { color: var(--accent2); }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(76,201,240,.3);
+      border-top-color: var(--accent2); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: -2px; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    footer { text-align: center; margin-top: 22px; font-size: .8rem; color: var(--muted); }
+    footer a { color: var(--accent2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Open<span class="grad">ScoreAI</span> 🎼</h1>
+    <p class="subtitle">Convierte tu audio en partitura: MIDI, MusicXML o PDF.</p>
+
+    <div class="drop" id="drop">
+      <div class="icon">🎤</div>
+      <div>Arrastra un audio aquí o <u>haz clic para elegir</u></div>
+      <div class="hint">WAV, MP3, FLAC, OGG, M4A</div>
+      <div class="file" id="fileName"></div>
+    </div>
+    <input type="file" id="fileInput" accept=".wav,.mp3,.flac,.ogg,.m4a" />
+
+    <div class="label">Formato de salida</div>
+    <div class="formats">
+      <label><input type="radio" name="fmt" value="midi" checked /><span>MIDI<small>.mid</small></span></label>
+      <label><input type="radio" name="fmt" value="musicxml" /><span>MusicXML<small>.musicxml</small></span></label>
+      <label><input type="radio" name="fmt" value="pdf" /><span>PDF<small>partitura</small></span></label>
+    </div>
+
+    <button class="go" id="go" disabled>Transcribir</button>
+    <div class="status" id="status"></div>
+
+    <footer>
+      Hecho con ❤️ · <a href="https://github.com/natalia-lopez-carmona/OpenScoreAI" target="_blank">Código en GitHub</a>
+    </footer>
+  </div>
+
+  <script>
+    const drop = document.getElementById('drop');
+    const fileInput = document.getElementById('fileInput');
+    const fileName = document.getElementById('fileName');
+    const go = document.getElementById('go');
+    const status = document.getElementById('status');
+    let selectedFile = null;
+
+    function setFile(f) {
+      selectedFile = f;
+      fileName.textContent = f ? '✓ ' + f.name : '';
+      go.disabled = !f;
+      status.className = 'status';
+      status.textContent = '';
+    }
+
+    drop.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', e => setFile(e.target.files[0] || null));
+    ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.add('drag');
+    }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.remove('drag');
+    }));
+    drop.addEventListener('drop', e => {
+      if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+    });
+
+    go.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      const fmt = document.querySelector('input[name=fmt]:checked').value;
+      go.disabled = true;
+      status.className = 'status load';
+      status.innerHTML = '<span class="spinner"></span>Transcribiendo… (la primera vez tarda un poco)';
+
+      try {
+        const form = new FormData();
+        form.append('file', selectedFile);
+        const resp = await fetch('/transcribe?format=' + fmt, { method: 'POST', body: form });
+        if (!resp.ok) {
+          let detail = 'Error ' + resp.status;
+          try { detail = (await resp.json()).detail || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        // Descargar el archivo devuelto.
+        const blob = await resp.blob();
+        const cd = resp.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="?([^"]+)"?/);
+        const ext = { midi: 'mid', musicxml: 'musicxml', pdf: 'pdf' }[fmt];
+        const name = match ? match[1] : selectedFile.name.replace(/\.[^.]+$/, '') + '.' + ext;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name; a.click();
+        URL.revokeObjectURL(url);
+        status.className = 'status ok';
+        status.textContent = '✓ Listo: ' + name + ' descargado';
+      } catch (err) {
+        status.className = 'status err';
+        status.textContent = '✗ ' + err.message;
+      } finally {
+        go.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
