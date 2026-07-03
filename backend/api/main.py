@@ -131,14 +131,27 @@ def transcribe(
         )
 
     # format == pdf
-    from backend.musicxml.pdf_exporter import musicxml_to_pdf
+    from backend.musicxml.pdf_exporter import (
+        MuseScoreFailed,
+        MuseScoreNotFound,
+        musicxml_to_pdf,
+    )
 
     pdf_path = WORK_DIR / f"{uid}.pdf"
     try:
         musicxml_to_pdf(xml_path, pdf_path)
-    except RuntimeError as exc:
-        # MuseScore no instalado → 503 (servicio no disponible para esta función).
+    except MuseScoreNotFound as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except MuseScoreFailed as exc:
+        # Suele pasar al transcribir una mezcla completa (partitura densísima).
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No se pudo grabar el PDF: la partitura es demasiado densa "
+                "(probablemente audio polifónico). Activa 'Separar la voz primero' "
+                "o usa un fragmento más corto. El MIDI y el MusicXML sí funcionan."
+            ),
+        ) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"Error al exportar PDF: {exc}") from exc
     return FileResponse(pdf_path, media_type="application/pdf", filename=f"{stem}.pdf")

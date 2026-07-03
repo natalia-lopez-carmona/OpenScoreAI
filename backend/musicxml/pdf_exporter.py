@@ -38,30 +38,53 @@ def find_musescore() -> str | None:
     return None
 
 
-def musicxml_to_pdf(musicxml_path: str | Path, output_pdf_path: str | Path) -> Path:
+class MuseScoreNotFound(RuntimeError):
+    """MuseScore no está instalado."""
+
+
+class MuseScoreFailed(RuntimeError):
+    """MuseScore se ejecutó pero no pudo grabar el PDF (p. ej. partitura muy densa)."""
+
+
+def musicxml_to_pdf(
+    musicxml_path: str | Path,
+    output_pdf_path: str | Path,
+    *,
+    attempts: int = 2,
+) -> Path:
     """Convierte un MusicXML en PDF mediante MuseScore.
 
+    Reintenta ante fallos intermitentes. Distingue "no instalado" de "falló".
+
     Raises:
-        RuntimeError: si MuseScore no está instalado o la conversión falla.
+        MuseScoreNotFound: si MuseScore no está instalado.
+        MuseScoreFailed: si MuseScore no pudo generar el PDF tras varios intentos.
     """
     musicxml_path = Path(musicxml_path)
     output_pdf_path = Path(output_pdf_path)
 
     musescore = find_musescore()
     if not musescore:
-        raise RuntimeError(
+        raise MuseScoreNotFound(
             "MuseScore no encontrado. Instálalo (winget install Musescore.Musescore) "
             "o define la variable de entorno MUSESCORE_PATH."
         )
 
     output_pdf_path.parent.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(
-        [musescore, str(musicxml_path), "-o", str(output_pdf_path)],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
-    if result.returncode != 0 or not output_pdf_path.exists():
-        raise RuntimeError(f"MuseScore falló (código {result.returncode}): {result.stderr.strip()}")
+    last_code = None
+    for _ in range(max(1, attempts)):
+        result = subprocess.run(
+            [musescore, str(musicxml_path), "-o", str(output_pdf_path)],
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        if result.returncode == 0 and output_pdf_path.exists():
+            return output_pdf_path
+        last_code = result.returncode
+        output_pdf_path.unlink(missing_ok=True)
 
-    return output_pdf_path
+    raise MuseScoreFailed(
+        f"MuseScore no pudo grabar el PDF (código {last_code}). "
+        "La partitura puede ser demasiado densa."
+    )
